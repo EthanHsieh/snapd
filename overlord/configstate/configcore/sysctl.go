@@ -63,15 +63,16 @@ func handleSysctlConfiguration(tr config.ConfGetter, opts *fsOnlyContext) error 
 		return nil
 	}
 
-	var sysctlConf string
 	if consoleLoglevelStr != "" {
 		content.WriteString(fmt.Sprintf("kernel.printk = %s 4 1 7\n", consoleLoglevelStr))
-		sysctlConf = filepath.Join(dir, name)
 	} else {
-		// Don't write values to content so that the file setting this option gets removed.
+		// Don't write values to content so that the file gets removed.
 		// Reset console-loglevel to default value.
-		sysctlConf = filepath.Join(dir, "10-console-messages.conf")
+		if !osutil.FileExists(filepath.Join(dir, "10-console-messages.conf")) {
+			return nil
+		}
 	}
+
 	dirContent := map[string]osutil.FileState{}
 	if content.Len() > 0 {
 		dirContent[name] = &osutil.MemoryFileState{
@@ -89,7 +90,7 @@ func handleSysctlConfiguration(tr config.ConfGetter, opts *fsOnlyContext) error 
 
 	if opts == nil {
 		if len(changed) > 0 || len(removed) > 0 {
-			if output, err := exec.Command("sysctl", "-p", sysctlConf).CombinedOutput(); err != nil {
+			if output, err := exec.Command(filepath.Join(root, "/lib/systemd/systemd-sysctl"), "--prefix=kernel.printk").CombinedOutput(); err != nil {
 				return osutil.OutputErr(output, err)
 			}
 		}
